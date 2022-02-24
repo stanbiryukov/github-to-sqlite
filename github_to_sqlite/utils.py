@@ -5,20 +5,20 @@ from functools import partial
 from typing import Callable
 
 import requests
-import tenacity
 import yaml
 
 
-# tenacity decorator to safely run requests.get
-@tenacity.retry(
-        wait=tenacity.wait_exponential(multiplier=1, max=256) + tenacity.wait_random(min=1, max=5),
-        stop=tenacity.stop_after_attempt(7),
-        after=partial(print , "Retrying..."),
-)
 def safe_get(url, headers=None):
-    resp = requests.get(url, headers=headers)
-    resp.raise_for_status()
-    return resp
+    for i in range(10):
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 403:
+                time.sleep(2 ** i)
+                continue
+            return response
+        except requests.exceptions.RequestException:
+            time.sleep(1)
+    raise Exception("Failed to fetch {}".format(url))
 
 
 FTS_CONFIG = {
