@@ -1,8 +1,25 @@
 import base64
-import requests
 import re
 import time
+from functools import partial
+from typing import Callable
+
+import requests
+import tenacity
 import yaml
+
+
+# tenacity decorator to safely run requests.get
+@tenacity.retry(
+        wait=tenacity.wait_exponential(multiplier=1, max=256) + tenacity.wait_random(min=1, max=5),
+        stop=tenacity.stop_after_attempt(7),
+        after=partial(print , "Retrying..."),
+)
+def safe_get(url, headers=None):
+    resp = requests.get(url, headers=headers)
+    resp.raise_for_status()
+    return resp
+
 
 FTS_CONFIG = {
     # table: columns
@@ -292,7 +309,7 @@ def fetch_repo(full_name, token=None):
     headers["Accept"] = "application/vnd.github.mercy-preview+json"
     owner, slug = full_name.split("/")
     url = "https://api.github.com/repos/{}/{}".format(owner, slug)
-    response = requests.get(url, headers=headers)
+    response = safe_get(url, headers=headers)
     response.raise_for_status()
     return response.json()
 
@@ -343,7 +360,7 @@ def fetch_issues(repo, token=None, issue_ids=None):
     if issue_ids:
         for issue_id in issue_ids:
             url = "https://api.github.com/repos/{}/issues/{}".format(repo, issue_id)
-            response = requests.get(url, headers=headers)
+            response = safe_get(url, headers=headers)
             response.raise_for_status()
             yield response.json()
     else:
@@ -360,7 +377,7 @@ def fetch_pull_requests(repo, token=None, pull_request_ids=None):
             url = "https://api.github.com/repos/{}/pulls/{}".format(
                 repo, pull_request_id
             )
-            response = requests.get(url, headers=headers)
+            response = safe_get(url, headers=headers)
             response.raise_for_status()
             yield response.json()
     else:
@@ -459,12 +476,12 @@ def fetch_user(username=None, token=None):
         url = "https://api.github.com/users/{}".format(username)
     else:
         url = "https://api.github.com/user"
-    return requests.get(url, headers=headers).json()
+    return safe_get(url, headers=headers).json()
 
 
 def paginate(url, headers=None):
     while url:
-        response = requests.get(url, headers=headers)
+        response = safe_get(url, headers=headers)
         # For HTTP 204 no-content this yields an empty list
         if response.status_code == 204:
             return
@@ -479,7 +496,9 @@ def paginate(url, headers=None):
 
 
 def make_headers(token=None):
-    headers = {}
+    # get requests default headers
+    headers = requests.utils.default_headers()
+    headers["User-Agent"] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36'
     if token is not None:
         headers["Authorization"] = "token {}".format(token)
     return headers
@@ -710,7 +729,7 @@ def ensure_db_shape(db):
 def scrape_dependents(repo, verbose=False):
     from bs4 import BeautifulSoup
     url = "https://github.com/{}/network/dependents".format(repo)
-    response = requests.get(url)
+    response = safe_get(url)
     soup = BeautifulSoup(response.content, "html.parser")
     # Navigate through Package toggle if present
     options = soup.find_all("a", class_="select-menu-item")
@@ -736,7 +755,7 @@ def _scrape_dependents(url, verbose=False):
     while url:
         if verbose:
             print(url)
-        response = requests.get(url)
+        response = safe_get(url)
         soup = BeautifulSoup(response.content, "html.parser")
         repos = [
             a["href"].lstrip("/")
@@ -759,13 +778,13 @@ def _scrape_dependents(url, verbose=False):
 
 def fetch_emojis(token=None):
     headers = make_headers(token)
-    response = requests.get("https://api.github.com/emojis", headers=headers)
+    response = safe_get("https://api.github.com/emojis", headers=headers)
     response.raise_for_status()
     return [{"name": key, "url": value} for key, value in response.json().items()]
 
 
 def fetch_image(url):
-    return requests.get(url).content
+    return safe_get(url).content
 
 
 def get(url, token=None, accept=None):
@@ -774,7 +793,7 @@ def get(url, token=None, accept=None):
         headers["accept"] = accept
     if url.startswith("/"):
         url = "https://api.github.com{}".format(url)
-    response = requests.get(url, headers=headers)
+    response = safe_get(url, headers=headers)
     response.raise_for_status()
     return response
 
@@ -784,7 +803,7 @@ def fetch_readme(token, full_name, html=False):
     if html:
         headers["accept"] = "application/vnd.github.VERSION.html"
     url = "https://api.github.com/repos/{}/readme".format(full_name)
-    response = requests.get(url, headers=headers)
+    response = safe_get(url, headers=headers)
     if response.status_code != 200:
         return None
     if html:
@@ -816,13 +835,13 @@ def rewrite_readme_html(html):
 def fetch_workflows(token, full_name):
     headers = make_headers(token)
     url = "https://api.github.com/repos/{}/contents/.github/workflows".format(full_name)
-    response = requests.get(url, headers=headers)
+    response = safe_get(url, headers=headers)
     if response.status_code == 404:
         return {}
     workflows = {}
     for item in response.json():
         name = item["name"]
-        content = requests.get(item["download_url"]).text
+        content = safe_get(item["download_url"]).text
         workflows[name] = content
     return workflows
 
