@@ -496,9 +496,7 @@ def paginate(url, headers=None):
 
 
 def make_headers(token=None):
-    # get requests default headers
-    headers = requests.utils.default_headers()
-    headers["User-Agent"] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36'
+    headers = {}
     if token is not None:
         headers["Authorization"] = "token {}".format(token)
     return headers
