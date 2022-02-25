@@ -325,8 +325,11 @@ def fetch_repo(full_name, token=None):
     owner, slug = full_name.split("/")
     url = "https://api.github.com/repos/{}/{}".format(owner, slug)
     response = safe_get(url, headers=headers)
-    response.raise_for_status()
-    return response.json()
+    ret = response.json()
+    ret["name"] = slug
+    ret["full_name"] = full_name
+    ret["html_url"] = f"https://github.com/{full_name}"
+    return ret
 
 
 def save_repo(db, repo):
@@ -337,8 +340,15 @@ def save_repo(db, repo):
         for key, value in repo.items()
         if (key == "html_url") or not key.endswith("url")
     }
-    to_save["owner"] = save_user(db, to_save["owner"])
-    to_save["license"] = save_license(db, to_save["license"])
+    if "owner" in to_save:
+        to_save["owner"] = save_user(db, to_save["owner"])
+    else:
+        to_save["owner"] = "private"
+        to_save["private"] = True
+    if "license" in to_save:
+        to_save["license"] = save_license(db, to_save["license"])
+    else:
+        to_save["license"] = "private"
     if "organization" in to_save:
         to_save["organization"] = save_user(db, to_save["organization"])
     else:
@@ -766,6 +776,8 @@ def _scrape_dependents(url, verbose=False):
     from bs4 import BeautifulSoup
 
     while url:
+        if verbose:
+            print(f"Scraping {url}")
         response = safe_get(url, headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36'})
         soup = BeautifulSoup(response.content, "html.parser")
         repos = [

@@ -270,16 +270,10 @@ def repos(db_path, usernames, auth, repo, load, readme, readme_html):
 
 def _repo_readme(db, token, repo_id, full_name, readme, readme_html):
     if readme:
-        try:
-            readme = utils.fetch_readme(token, full_name)
-        except Exception as e:
-            readme = str(e)
+        readme = utils.fetch_readme(token, full_name)
         db["repos"].update(repo_id, {"readme": readme}, alter=True)
     if readme_html:
-        try:
-            readme_html = utils.fetch_readme(token, full_name, html=True)
-        except Exception as e:
-            readme = str(e)
+        readme_html = utils.fetch_readme(token, full_name, html=True)
         db["repos"].update(repo_id, {"readme_html": readme_html}, alter=True)
 
 
@@ -450,40 +444,45 @@ def scrape_dependents(db_path, repos, auth, verbose):
         utils.save_repo(db, repo_full)
 
         for dependent_repo in utils.scrape_dependents(repo, verbose):
-            # Don't fetch repo details if it's already in our DB
-            existing = list(db["repos"].rows_where("full_name = ?", [dependent_repo]))
-            if (verbose and existing):
-                print(f"{dependent_repo} already in DB")
-            dependent_id = None
-            if not existing:
-                if verbose:
-                    print(f"{dependent_repo} not in DB, fetching details")
-                dependent_full = utils.fetch_repo(dependent_repo, token)
-                time.sleep(1)
-                utils.save_repo(db, dependent_full)
-                if verbose:
-                    print(f"{dependent_repo} uploaded.")
-                dependent_id = dependent_full["id"]
-            else:
-                dependent_id = existing[0]["id"]
-            # Only insert if it isn't already there:
-            if not db["dependents"].exists() or not list(
-                db["dependents"].rows_where(
-                    "repo = ? and dependent = ?", [repo_full["id"], dependent_id]
-                )
-            ):
-                db["dependents"].insert(
-                    {
-                        "repo": repo_full["id"],
-                        "dependent": dependent_id,
-                        "first_seen_utc": datetime.datetime.utcnow().isoformat(),
-                    },
-                    pk=("repo", "dependent"),
-                    foreign_keys=(
-                        ("repo", "repos", "id"),
-                        ("dependent", "repos", "id"),
-                    ),
-                )
+            try:
+                # Don't fetch repo details if it's already in our DB
+                existing = list(db["repos"].rows_where("full_name = ?", [dependent_repo]))
+                if (verbose and existing):
+                    print(f"{dependent_repo} already in DB")
+                dependent_id = None
+                if not existing:
+                    if verbose:
+                        print(f"{dependent_repo} not in DB, fetching details")
+                    dependent_full = utils.fetch_repo(dependent_repo, token)
+                    time.sleep(1)
+                    utils.save_repo(db, dependent_full)
+                    if verbose:
+                        print(f"{dependent_repo} uploaded.")
+                    dependent_id = dependent_full["id"]
+                else:
+                    dependent_id = existing[0]["id"]
+                # Only insert if it isn't already there:
+                if not db["dependents"].exists() or not list(
+                    db["dependents"].rows_where(
+                        "repo = ? and dependent = ?", [repo_full["id"], dependent_id]
+                    )
+                ):
+                    db["dependents"].insert(
+                        {
+                            "repo": repo_full["id"],
+                            "dependent": dependent_id,
+                            "first_seen_utc": datetime.datetime.utcnow().isoformat(),
+                        },
+                        pk=("repo", "dependent"),
+                        foreign_keys=(
+                            ("repo", "repos", "id"),
+                            ("dependent", "repos", "id"),
+                        ),
+                    )
+            except Exception as e:
+                print(e)
+                print(f"Failed to scrape {dependent_repo}")
+                continue
 
     utils.ensure_db_shape(db)
 
