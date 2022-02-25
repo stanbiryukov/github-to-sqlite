@@ -9,16 +9,17 @@ import yaml
 
 
 def safe_get(url, headers=None):
-    for i in range(10):
+    for i in range(5):
         try:
             response = requests.get(url, headers=headers)
             if response.status_code >= 400:
                 time.sleep(2 ** i)
                 continue
             return response
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            print(e)
             time.sleep(1)
-    raise Exception("Failed to fetch {}".format(url))
+    return response
 
 
 FTS_CONFIG = {
