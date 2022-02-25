@@ -1,8 +1,6 @@
 import base64
 import re
 import time
-from functools import partial
-from typing import Callable
 
 import requests
 import yaml
