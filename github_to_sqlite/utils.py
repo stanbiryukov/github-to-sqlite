@@ -12,7 +12,7 @@ def safe_get(url, headers=None):
     for i in range(10):
         try:
             response = requests.get(url, headers=headers)
-            if response.status_code == 403:
+            if response.status_code >= 400:
                 time.sleep(2 ** i)
                 continue
             return response
