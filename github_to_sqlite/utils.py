@@ -778,8 +778,6 @@ def _scrape_dependents(url, verbose=False):
         # next page?
         try:
             next_link = soup.select(".paginate-container")[0].find("a", text="Next")
-            if verbose:
-                print(f"Next: {next_link['href']}")
         except IndexError:
             if verbose:
                 print("No next page found {url}")

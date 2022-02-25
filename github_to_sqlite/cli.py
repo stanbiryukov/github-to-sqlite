@@ -270,10 +270,16 @@ def repos(db_path, usernames, auth, repo, load, readme, readme_html):
 
 def _repo_readme(db, token, repo_id, full_name, readme, readme_html):
     if readme:
-        readme = utils.fetch_readme(token, full_name)
+        try:
+            readme = utils.fetch_readme(token, full_name)
+        except Exception as e:
+            readme = str(e)
         db["repos"].update(repo_id, {"readme": readme}, alter=True)
     if readme_html:
-        readme_html = utils.fetch_readme(token, full_name, html=True)
+        try:
+            readme_html = utils.fetch_readme(token, full_name, html=True)
+        except Exception as e:
+            readme = str(e)
         db["repos"].update(repo_id, {"readme_html": readme_html}, alter=True)
 
 
