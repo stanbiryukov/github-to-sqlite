@@ -446,11 +446,17 @@ def scrape_dependents(db_path, repos, auth, verbose):
         for dependent_repo in utils.scrape_dependents(repo, verbose):
             # Don't fetch repo details if it's already in our DB
             existing = list(db["repos"].rows_where("full_name = ?", [dependent_repo]))
+            if verbose:
+                print(f"{dependent_repo} already in DB")
             dependent_id = None
             if not existing:
+                if verbose:
+                    print(f"{dependent_repo} not in DB, fetching details")
                 dependent_full = utils.fetch_repo(dependent_repo, token)
                 time.sleep(1)
                 utils.save_repo(db, dependent_full)
+                if verbose:
+                    print(f"{dependent_repo} uploaded.")
                 dependent_id = dependent_full["id"]
             else:
                 dependent_id = existing[0]["id"]

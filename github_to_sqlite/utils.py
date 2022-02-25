@@ -4,9 +4,25 @@ import time
 
 import requests
 import yaml
+import random
+from memoization import cached
 
-
+@cached
 def safe_get(url, headers=None):
+    for i in range(5):
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code >= 400:
+                print(f"{response.status_code}. Sleeping {2 ** i} seconds")
+                time.sleep(2 ** i)
+                continue
+            return response
+        except requests.exceptions.RequestException as e:
+            print(e)
+            time.sleep(1)
+    return response
+
+def unsafe_get(url, headers=None):
     for i in range(5):
         try:
             response = requests.get(url, headers=headers)
@@ -750,9 +766,7 @@ def _scrape_dependents(url, verbose=False):
     from bs4 import BeautifulSoup
 
     while url:
-        if verbose:
-            print(url)
-        response = safe_get(url)
+        response = safe_get(url, headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36'})
         soup = BeautifulSoup(response.content, "html.parser")
         repos = [
             a["href"].lstrip("/")
@@ -764,11 +778,15 @@ def _scrape_dependents(url, verbose=False):
         # next page?
         try:
             next_link = soup.select(".paginate-container")[0].find("a", text="Next")
+            if verbose:
+                print(f"Next: {next_link['href']}")
         except IndexError:
+            if verbose:
+                print("No next page found {url}")
             break
         if next_link is not None:
             url = next_link["href"]
-            time.sleep(1)
+            time.sleep(random.uniform(0.5, 5.0))
         else:
             url = None
 
