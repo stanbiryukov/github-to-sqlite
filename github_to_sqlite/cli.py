@@ -445,8 +445,13 @@ def scrape_dependents(db_path, repos, auth, verbose):
 
         for dependent_repo in utils.scrape_dependents(repo, verbose):
             try:
-                # Don't fetch repo details if it's already in our DB
-                existing = list(db["repos"].rows_where("full_name = ?", [dependent_repo]))
+                # attempt to scrape if not exists or if row message contains a rate limit exception
+                existing = list(db["repos"].rows_where("full_name = :dependent_repo", {'dependent_repo': dependent_repo}))
+                if (existing) and (existing[0].get("message") is not None) and ('rate limit' in existing[0].get("message")):
+                    # drop that row
+                    db["repos"].delete(existing[0]["id"])
+                    db["dependents"].delete((repo_full["id"], existing[0]["id"]))
+                    existing = None
                 if (verbose and existing):
                     print(f"{dependent_repo} already in DB")
                 dependent_id = None
